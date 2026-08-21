@@ -4,10 +4,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-import config
 import database as db
 import game_data as gd
-from utils.rolls import roll_fish
+import utils.ui as ui
+from utils.rolls import roll_fish, roll_weight
 
 
 class Fishing(commands.Cog):
@@ -24,28 +24,34 @@ class Fishing(commands.Cog):
             if last is not None and (now - last) < gd.FISH_COOLDOWN:
                 remaining = gd.FISH_COOLDOWN - (now - last)
                 await interaction.response.send_message(
-                    f"⏳ Your line's still out. Try again in **{remaining:.0f}s**.",
-                    ephemeral=True,
+                    view=ui.cooldown_view(remaining, kind="fish"), ephemeral=True
                 )
                 return
 
             fish_id, name, emoji, rarity, value, min_rod = roll_fish(user["rod_tier"])
             prior_qty = await db.get_fish_qty(uid, fish_id)
+            is_new = prior_qty == 0
 
             await db.set_last_fish(uid, now)
             await db.add_fish(uid, fish_id, 1)
 
-        rarity_info = gd.RARITIES[rarity]
-        is_new = prior_qty == 0
+            unique_species = None
+            if is_new:
+                unique_species = len(await db.get_inventory(uid))
 
-        embed = discord.Embed(
-            title=f"{emoji} You caught a {name}!",
-            description=f"{rarity_info['emoji']} **{rarity.title()}** • worth {value:,} {config.CURRENCY_EMOJI}",
-            color=rarity_info["color"],
+        await interaction.response.send_message(
+            view=ui.catch_view(
+                name=name,
+                emoji=emoji,
+                rarity=rarity,
+                value=value,
+                is_new=is_new,
+                owned_qty=prior_qty + 1,
+                weight=roll_weight(rarity),
+                unique_species=unique_species,
+                total_species=len(gd.FISH),
+            )
         )
-        if is_new:
-            embed.add_field(name="✨ New Discovery!", value=f"Added **{name}** to your collection.")
-        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):

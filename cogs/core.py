@@ -7,6 +7,7 @@ from discord.ext import commands
 import config
 import database as db
 import game_data as gd
+import utils.ui as ui
 
 
 class Core(commands.Cog):
@@ -16,9 +17,12 @@ class Core(commands.Cog):
     @app_commands.command(name="balance", description="Check your Nibbles balance.")
     async def balance(self, interaction: discord.Interaction):
         user = await db.get_user(interaction.user.id)
-        await interaction.response.send_message(
-            f"{config.CURRENCY_EMOJI} You have **{user['balance']:,} {config.CURRENCY_NAME}**."
-        )
+        lines = [
+            ui.BRAND,
+            f"### {config.CURRENCY_EMOJI} Balance",
+            f"You have **{user['balance']:,} {config.CURRENCY_NAME}**.",
+        ]
+        await interaction.response.send_message(view=ui.SimpleView(lines, accent=0x2B2D31))
 
     @app_commands.command(name="daily", description="Claim your daily reward.")
     async def daily(self, interaction: discord.Interaction):
@@ -32,14 +36,13 @@ class Core(commands.Cog):
             if last is not None:
                 elapsed_h = (now - last) / 3600
                 if elapsed_h < gd.DAILY_COOLDOWN_HOURS:
-                    remaining = gd.DAILY_COOLDOWN_HOURS - elapsed_h
-                    h, m = int(remaining), int((remaining % 1) * 60)
+                    remaining_h = gd.DAILY_COOLDOWN_HOURS - elapsed_h
                     await interaction.response.send_message(
-                        f"⏳ You already claimed today. Try again in **{h}h {m}m**.",
+                        view=ui.cooldown_view(remaining_h * 3600, kind="daily"),
                         ephemeral=True,
                     )
                     return
-
+                # Within grace window -> streak continues, else resets.
                 if elapsed_h > gd.DAILY_STREAK_GRACE_HOURS:
                     streak = 0
 
@@ -53,16 +56,7 @@ class Core(commands.Cog):
             await db.set_daily(uid, now, streak)
             await db.add_balance(uid, reward)
 
-        embed = discord.Embed(
-            title="🐾 Daily Reward Claimed!",
-            description=(
-                f"You received **{reward:,} {config.CURRENCY_NAME}** "
-                f"{config.CURRENCY_EMOJI}\n"
-                f"🔥 Streak: **{streak}** day(s)"
-            ),
-            color=0xFFC107,
-        )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(view=ui.daily_view(reward=reward, streak=streak))
 
     @app_commands.command(name="profile", description="View your Nibble profile.")
     @app_commands.describe(user="Whose profile to view (defaults to you)")
@@ -70,24 +64,15 @@ class Core(commands.Cog):
         target = user or interaction.user
         u = await db.get_user(target.id)
         inv = await db.get_inventory(target.id)
-        unique_fish = len(inv)
-        total_species = len(gd.FISH)
-        rod = gd.RODS[u["rod_tier"]]
 
-        embed = discord.Embed(title=f"🐱 {target.display_name}'s Profile", color=0x03A9F4)
-        embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(
-            name="Balance", value=f"{config.CURRENCY_EMOJI} {u['balance']:,}", inline=True
+        await interaction.response.send_message(
+            view=ui.profile_view(
+                target=target,
+                user_row=u,
+                unique_fish=len(inv),
+                total_species=len(gd.FISH),
+            )
         )
-        embed.add_field(name="Rod", value=rod["name"], inline=True)
-        embed.add_field(name="Daily Streak", value=f"🔥 {u['daily_streak']}", inline=True)
-        embed.add_field(
-            name="Collection",
-            value=f"📖 {unique_fish}/{total_species} species discovered",
-            inline=True,
-        )
-        embed.add_field(name="Total Fish Caught", value=f"🎣 {u['total_fish']:,}", inline=True)
-        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):
