@@ -1,0 +1,18 @@
+[Unit]
+Description=Nibble Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust User/WorkingDirectory to match where you deployed the bot on EC2.
+User=ubuntu
+WorkingDirectory=/home/ubuntu/nibble
+ExecStart=/home/ubuntu/nibble/venv/bin/python3 /home/ubuntu/nibble/main.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/ubuntu/nibble/logs/systemd.log
+StandardError=append:/home/ubuntu/nibble/logs/systemd.log
+
+[Install]
+WantedBy=multi-user.target
