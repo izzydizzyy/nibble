@@ -31,3 +31,11 @@ def roll_fish(rod_tier: int) -> tuple:
         candidates = [f for f in gd.FISH if f[5] <= rod_tier]
 
     return random.choice(candidates)
+
+
+def roll_weight(rarity: str) -> float:
+    """Cosmetic size for a catch, in lbs. Not stored -- just flavor text
+    shown on the catch card."""
+    lo, hi = gd.WEIGHT_RANGES[rarity]
+    return round(random.uniform(lo, hi), 1)
+

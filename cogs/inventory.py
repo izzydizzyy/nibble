@@ -2,9 +2,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-import config
 import database as db
 import game_data as gd
+import utils.ui as ui
 
 
 class Inventory(commands.Cog):
@@ -13,67 +13,36 @@ class Inventory(commands.Cog):
 
     @app_commands.command(name="inventory", description="See the fish you're holding.")
     async def inventory(self, interaction: discord.Interaction):
-        uid = interaction.user.id
-        rows = await db.get_inventory(uid)
-        if not rows:
-            await interaction.response.send_message(
-                "Your bag is empty. Go `/fish` to catch something!", ephemeral=True
-            )
-            return
-
-        lines = []
-        total_value = 0
-        for row in rows:
-            f = gd.FISH_BY_ID[row["fish_id"]]
-            _, name, emoji, rarity, value, _ = f
-            qty = row["quantity"]
-            total_value += value * qty
-            lines.append(f"{emoji} **{name}** x{qty} — {gd.RARITIES[rarity]['emoji']} {rarity}")
-
-        embed = discord.Embed(
-            title=f"🎒 {interaction.user.display_name}'s Inventory",
-            description="\n".join(lines[:25]),
-            color=0x795548,
+        rows = await db.get_inventory(interaction.user.id)
+        await interaction.response.send_message(
+            view=ui.inventory_view(target=interaction.user, rows=rows)
         )
-        embed.set_footer(text=f"Total sell value: {total_value:,} {config.CURRENCY_NAME}")
-        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="collection", description="See your collection progress across all species.")
     async def collection(self, interaction: discord.Interaction):
-        uid = interaction.user.id
-        rows = {r["fish_id"]: r["quantity"] for r in await db.get_inventory(uid)}
-
-        by_rarity: dict[str, list[str]] = {r: [] for r in gd.RARITY_ORDER}
-        for fish_id, name, emoji, rarity, value, _ in gd.FISH:
-            owned = rows.get(fish_id, 0)
-            mark = f"{emoji} {name}" if owned > 0 else f"❓ ???"
-            by_rarity[rarity].append(mark)
-
-        embed = discord.Embed(
-            title=f"📖 {interaction.user.display_name}'s Collection",
-            description=f"{len(rows)}/{len(gd.FISH)} species discovered",
-            color=0x00BCD4,
-        )
-        for rarity in gd.RARITY_ORDER:
-            entries = by_rarity[rarity]
-            embed.add_field(
-                name=f"{gd.RARITIES[rarity]['emoji']} {rarity.title()}",
-                value="\n".join(entries) or "—",
-                inline=True,
+        rows = await db.get_inventory(interaction.user.id)
+        owned_ids = {r["fish_id"] for r in rows}
+        await interaction.response.send_message(
+            view=ui.collection_view(
+                target=interaction.user,
+                owned_ids=owned_ids,
+                total_species=len(gd.FISH),
             )
-        await interaction.response.send_message(embed=embed)
+        )
 
     @app_commands.command(name="sell", description="Sell fish from your inventory.")
     @app_commands.describe(fish="Name of the fish to sell", quantity="How many to sell (default 1)")
     async def sell(self, interaction: discord.Interaction, fish: str, quantity: int = 1):
         if quantity < 1:
-            await interaction.response.send_message("Quantity must be at least 1.", ephemeral=True)
+            await interaction.response.send_message(
+                view=ui.error_view("Quantity must be at least 1."), ephemeral=True
+            )
             return
 
         match = next((f for f in gd.FISH if f[1].lower() == fish.lower()), None)
         if not match:
             await interaction.response.send_message(
-                f"Couldn't find a fish named **{fish}**. Check `/inventory` for exact names.",
+                view=ui.error_view(f"Couldn't find a fish named **{fish}**. Check `/inventory` for exact names."),
                 ephemeral=True,
             )
             return
@@ -86,7 +55,7 @@ class Inventory(commands.Cog):
             if not removed:
                 owned = await db.get_fish_qty(uid, fish_id)
                 await interaction.response.send_message(
-                    f"You only have **{owned}x {name}** — can't sell {quantity}.",
+                    view=ui.error_view(f"You only have **{owned}x {name}** — can't sell {quantity}."),
                     ephemeral=True,
                 )
                 return
@@ -94,7 +63,7 @@ class Inventory(commands.Cog):
             await db.add_balance(uid, payout)
 
         await interaction.response.send_message(
-            f"💰 Sold **{quantity}x {emoji} {name}** for **{payout:,} {config.CURRENCY_NAME}**."
+            view=ui.sell_view(name=name, emoji=emoji, quantity=quantity, payout=payout)
         )
 
     @sell.autocomplete("fish")
@@ -130,12 +99,16 @@ class Inventory(commands.Cog):
                 await db.add_balance(uid, total)
 
         if count == 0:
-            await interaction.response.send_message("Nothing to sell.", ephemeral=True)
+            await interaction.response.send_message(
+                view=ui.error_view("Nothing to sell."), ephemeral=True
+            )
             return
 
-        filt = f" ({rarity.value})" if rarity else ""
         await interaction.response.send_message(
-            f"💰 Sold **{count}** fish{filt} for **{total:,} {config.CURRENCY_NAME}**."
+            view=ui.sell_all_view(
+                count=count, total=total,
+                rarity_filter=rarity.value if rarity else None,
+            )
         )
 
 

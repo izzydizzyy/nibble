@@ -8,11 +8,12 @@ from discord.ext import commands
 
 import config
 import database as db
+import utils.ui as ui
 
 os.makedirs("data", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 
-
+# ---------------------------------------------------------------- logging --
 logger = logging.getLogger("nibble")
 logger.setLevel(logging.INFO)
 
@@ -82,15 +83,16 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
     logger.error("Slash command error in /%s: %s", interaction.command.name if interaction.command else "?", error)
 
     if isinstance(error, discord.app_commands.CommandOnCooldown):
-        msg = f"⏳ Slow down — try again in {error.retry_after:.1f}s."
+        msg = f"Slow down — try again in {error.retry_after:.1f}s."
     else:
-        msg = "⚠️ Something went wrong running that command. It's been logged."
+        msg = "Something went wrong running that command. It's been logged."
 
+    view = ui.error_view(msg)
     try:
         if interaction.response.is_done():
-            await interaction.followup.send(msg, ephemeral=True)
+            await interaction.followup.send(view=view, ephemeral=True)
         else:
-            await interaction.response.send_message(msg, ephemeral=True)
+            await interaction.response.send_message(view=view, ephemeral=True)
     except discord.HTTPException:
         pass
 
