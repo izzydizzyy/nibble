@@ -1,8 +1,8 @@
 import discord
 from discord.ext import commands
 
-from utils.embeds import log_embed
-from utils.views import LogView
+from utils.layout import LogLayout
+from utils.views import IDButton
 
 
 class ChannelLogs(commands.Cog):
@@ -20,34 +20,38 @@ class ChannelLogs(commands.Cog):
         dest = await self._channel_for(channel.guild.id, "channel_create")
         if dest is None:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="channel_create",
             title="Channel Created",
             color=self.bot.theme_color,
             fields=[
-                ("Name", channel.mention, False),
-                ("Type", str(channel.type).replace("_", " ").title(), False),
-                ("Category", channel.category.name if channel.category else "*None*", False),
+                ("Name", channel.mention),
+                ("Type", str(channel.type).replace("_", " ").title()),
+                ("Category", channel.category.name if channel.category else "*None*"),
             ],
             footer=f"Channel ID: {channel.id}",
+            buttons=[IDButton("Channel ID", channel.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("Channel ID", channel.id))
+        await dest.send(view=view)
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
         dest = await self._channel_for(channel.guild.id, "channel_delete")
         if dest is None:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="channel_delete",
             title="Channel Deleted",
             color=self.bot.theme_color,
             fields=[
-                ("Name", f"#{channel.name}", False),
-                ("Type", str(channel.type).replace("_", " ").title(), False),
-                ("Category", channel.category.name if channel.category else "*None*", False),
+                ("Name", f"#{channel.name}"),
+                ("Type", str(channel.type).replace("_", " ").title()),
+                ("Category", channel.category.name if channel.category else "*None*"),
             ],
             footer=f"Channel ID: {channel.id}",
+            buttons=[IDButton("Channel ID", channel.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("Channel ID", channel.id))
+        await dest.send(view=view)
 
     @commands.Cog.listener()
     async def on_guild_channel_update(
@@ -58,23 +62,23 @@ class ChannelLogs(commands.Cog):
             return
         changes = []
         if before.name != after.name:
-            changes.append(("Name", f"{before.name} -> {after.name}", False))
+            changes.append(("Name", f"{before.name} -> {after.name}"))
         if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
             if before.topic != after.topic:
-                changes.append(("Topic", f"{before.topic or '*None*'} -> {after.topic or '*None*'}", False))
+                changes.append(("Topic", f"{before.topic or '*None*'} -> {after.topic or '*None*'}"))
             if before.slowmode_delay != after.slowmode_delay:
-                changes.append(
-                    ("Slowmode", f"{before.slowmode_delay}s -> {after.slowmode_delay}s", False)
-                )
+                changes.append(("Slowmode", f"{before.slowmode_delay}s -> {after.slowmode_delay}s"))
         if not changes:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="channel_update",
             title="Channel Updated",
             color=self.bot.theme_color,
-            fields=[("Channel", after.mention, False)] + changes,
+            fields=[("Channel", after.mention)] + changes,
             footer=f"Channel ID: {after.id}",
+            buttons=[IDButton("Channel ID", after.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("Channel ID", after.id))
+        await dest.send(view=view)
 
 
 async def setup(bot: commands.Bot):

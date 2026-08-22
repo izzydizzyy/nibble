@@ -8,7 +8,8 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.config import VOTE_URL
-from utils.embeds import log_embed
+from utils.layout import LogLayout
+from utils.views import JumpButton
 
 
 class Vote(commands.Cog):
@@ -17,17 +18,15 @@ class Vote(commands.Cog):
 
     @app_commands.command(name="vote", description="Support the bot by voting for it.")
     async def vote(self, interaction: discord.Interaction):
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="vote",
             title="Vote for the Bot",
             color=self.bot.theme_color,
             description="Voting takes a few seconds and helps the bot reach more servers.",
             fields=[],
+            buttons=[JumpButton("Vote Now", VOTE_URL)],
         )
-        view = discord.ui.View()
-        view.add_item(
-            discord.ui.Button(label="Vote Now", style=discord.ButtonStyle.link, url=VOTE_URL)
-        )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

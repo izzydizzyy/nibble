@@ -41,20 +41,28 @@ cogs/help.py             /help command
 cogs/events/*.py         one file per event category
 ```
 
-## A note on Components V2
+## Components V2
 
-You linked the Discord4J Components V2 docs, but this build is on
-discord.py per your answer to the language question. discord.py 2.4+ can
-send Components V2 layouts (the `IS_COMPONENTS_V2` message flag with
-`Container`/`Section` primitives), but that support is newer and less
-ergonomic than plain embeds + views -- and mixing it with `discord.Embed`
-isn't allowed by Discord (CV2 messages can't use embeds at all). Given you
-also asked for embeds that match the Koira screenshot (title, fields,
-timestamp, footer, buttons), I built this on standard embeds + persistent
-`discord.ui.View` button rows, which is what that screenshot is actually
-using. If you'd rather go full Components V2 (no embeds, `Container`-based
-layout), say so and I'll rebuild the embed layer -- just flagging it now
-instead of guessing.
+Every message the bot sends -- logs, `/settings`, `/vote`, `/help` -- is a
+real `discord.ui.LayoutView` (`Container` + `TextDisplay`/`Section`/
+`Separator`/`ActionRow`), not an embed. Discord doesn't allow mixing the
+two in one message, so there's no `discord.Embed` anywhere in this
+codebase -- `utils/layout.py` is the one place that builds these, and
+every cog just calls `LogLayout(...)` and does `channel.send(view=...)`.
+This needs `discord.py>=2.6.0`; CV2 support landed there.
+
+## Emojis
+
+`utils/emojis.py` is the single place every emoji lives, keyed by event
+name (`message_delete`, `member_kick`, etc). It ships with Unicode
+defaults so the bot works with zero setup. To use emoji.gg art instead:
+custom emojis only get a usable Discord ID once they're uploaded to a
+server your bot can see -- emoji.gg hosts the image files, not IDs -- so
+pull art from categories like [Mod](https://emoji.gg/emojis/mod),
+[Shield](https://emoji.gg/emojis/shield), or [Ban](https://emoji.gg/emojis/ban),
+upload each to your server (Server Settings -> Emoji), and paste the
+resulting `<:name:id>` string into the matching key in that file. Nothing
+else needs to change.
 
 ## Extending
 

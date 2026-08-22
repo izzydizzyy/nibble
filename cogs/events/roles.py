@@ -1,8 +1,8 @@
 import discord
 from discord.ext import commands
 
-from utils.embeds import log_embed
-from utils.views import LogView
+from utils.layout import LogLayout
+from utils.views import IDButton
 
 
 class RoleLogs(commands.Cog):
@@ -20,30 +20,34 @@ class RoleLogs(commands.Cog):
         dest = await self._channel_for(role.guild.id, "role_create")
         if dest is None:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="role_create",
             title="Role Created",
             color=self.bot.theme_color,
             fields=[
-                ("Role", role.mention, False),
-                ("Color", str(role.color), True),
-                ("Hoisted", str(role.hoist), True),
+                ("Role", role.mention),
+                ("Color", str(role.color)),
+                ("Hoisted", str(role.hoist)),
             ],
             footer=f"Role ID: {role.id}",
+            buttons=[IDButton("Role ID", role.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("Role ID", role.id))
+        await dest.send(view=view)
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role):
         dest = await self._channel_for(role.guild.id, "role_delete")
         if dest is None:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="role_delete",
             title="Role Deleted",
             color=self.bot.theme_color,
-            fields=[("Name", f"@{role.name}", False)],
+            fields=[("Name", f"@{role.name}")],
             footer=f"Role ID: {role.id}",
+            buttons=[IDButton("Role ID", role.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("Role ID", role.id))
+        await dest.send(view=view)
 
     @commands.Cog.listener()
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role):
@@ -52,20 +56,22 @@ class RoleLogs(commands.Cog):
             return
         changes = []
         if before.name != after.name:
-            changes.append(("Name", f"{before.name} -> {after.name}", False))
+            changes.append(("Name", f"{before.name} -> {after.name}"))
         if before.color != after.color:
-            changes.append(("Color", f"{before.color} -> {after.color}", False))
+            changes.append(("Color", f"{before.color} -> {after.color}"))
         if before.permissions != after.permissions:
-            changes.append(("Permissions", "Changed (see audit log for detail)", False))
+            changes.append(("Permissions", "Changed (see audit log for detail)"))
         if not changes:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="role_update",
             title="Role Updated",
             color=self.bot.theme_color,
-            fields=[("Role", after.mention, False)] + changes,
+            fields=[("Role", after.mention)] + changes,
             footer=f"Role ID: {after.id}",
+            buttons=[IDButton("Role ID", after.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("Role ID", after.id))
+        await dest.send(view=view)
 
 
 async def setup(bot: commands.Bot):

@@ -1,8 +1,9 @@
 import discord
 from discord.ext import commands
 
-from utils.embeds import log_embed, user_line
-from utils.views import LogView
+from utils.format import user_line
+from utils.layout import LogLayout
+from utils.views import JumpButton
 
 
 class InviteLogs(commands.Cog):
@@ -20,37 +21,37 @@ class InviteLogs(commands.Cog):
         dest = await self._channel_for(invite.guild.id, "invite_create")
         if dest is None:
             return
-        embed = log_embed(
+        expires = f"<t:{int(invite.expires_at.timestamp())}:R>" if invite.expires_at else "Never"
+        view = LogLayout(
+            emoji_key="invite_create",
             title="Invite Created",
             color=self.bot.theme_color,
             fields=[
-                ("Code", f"`{invite.code}`", True),
-                ("Channel", invite.channel.mention, True),
-                ("Created By", user_line(invite.inviter), False),
-                (
-                    "Expires",
-                    f"<t:{int(invite.expires_at.timestamp())}:R>" if invite.expires_at else "Never",
-                    False,
-                ),
+                ("Code", f"`{invite.code}`"),
+                ("Channel", invite.channel.mention),
+                ("Created By", user_line(invite.inviter)),
+                ("Expires", expires),
             ],
             footer=f"Max Uses: {invite.max_uses or 'Unlimited'}",
+            buttons=[JumpButton("Open Channel", invite.channel.jump_url)],
         )
-        await dest.send(embed=embed, view=LogView().add_jump("Open Channel", invite.channel.jump_url))
+        await dest.send(view=view)
 
     @commands.Cog.listener()
     async def on_invite_delete(self, invite: discord.Invite):
         dest = await self._channel_for(invite.guild.id, "invite_delete")
         if dest is None:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="invite_delete",
             title="Invite Deleted",
             color=self.bot.theme_color,
             fields=[
-                ("Code", f"`{invite.code}`", True),
-                ("Channel", invite.channel.mention if invite.channel else "Unknown", True),
+                ("Code", f"`{invite.code}`"),
+                ("Channel", invite.channel.mention if invite.channel else "Unknown"),
             ],
         )
-        await dest.send(embed=embed)
+        await dest.send(view=view)
 
 
 async def setup(bot: commands.Bot):

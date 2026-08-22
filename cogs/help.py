@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.embeds import log_embed
+from utils.layout import LogLayout
 
 
 class Help(commands.Cog):
@@ -11,19 +11,20 @@ class Help(commands.Cog):
 
     @app_commands.command(name="help", description="List available commands.")
     async def help(self, interaction: discord.Interaction):
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="help",
             title="Command Reference",
             color=self.bot.theme_color,
             description="Configuration is done through `/settings`, everything else is standalone.",
             fields=[
-                ("/settings channel", "Set the default channel logs are sent to.", False),
-                ("/settings events", "Enable or disable categories of logged events.", False),
-                ("/settings toggle", "Turn all logging on or off.", False),
-                ("/settings status", "View the current logging configuration.", False),
-                ("/vote", "Get a link to vote for the bot.", False),
+                ("/settings channel", "Set the default channel logs are sent to."),
+                ("/settings events", "Enable or disable categories of logged events."),
+                ("/settings toggle", "Turn all logging on or off."),
+                ("/settings status", "View the current logging configuration."),
+                ("/vote", "Get a link to vote for the bot."),
             ],
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

@@ -3,10 +3,8 @@
   1. a channel select to set the default log channel
   2. a group select to bulk-toggle event categories
 
-Kept deliberately small. Per-event overrides exist in the DB layer already;
-exposing every single one through slash commands isn't worth the clutter,
-so /settings covers the 90% case and power users can ask for a specific
-override via a follow-up command if they ever need it.
+Every response here is a CV2 LogLayout too, so the config UI matches
+the log output instead of looking like a bolted-on legacy embed.
 """
 
 import discord
@@ -14,8 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.config import EVENT_GROUPS
-from utils.embeds import log_embed
-from utils.config import SUCCESS_COLOR
+from utils.layout import LogLayout
 
 
 class ChannelSelect(discord.ui.ChannelSelect):
@@ -29,18 +26,13 @@ class ChannelSelect(discord.ui.ChannelSelect):
     async def callback(self, interaction: discord.Interaction):
         channel = self.values[0]
         await self.bot.db.set_log_channel(interaction.guild_id, channel.id)
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="success",
             title="Log Channel Set",
-            color=SUCCESS_COLOR,
-            fields=[("Channel", channel.mention, False)],
+            color=self.bot.theme_color,
+            fields=[("Channel", channel.mention)],
         )
-        await interaction.response.edit_message(embed=embed, view=None)
-
-
-class ChannelSelectView(discord.ui.View):
-    def __init__(self, bot: commands.Bot):
-        super().__init__(timeout=60)
-        self.add_item(ChannelSelect(bot))
+        await interaction.response.edit_message(view=view)
 
 
 class GroupToggleSelect(discord.ui.Select):
@@ -65,18 +57,13 @@ class GroupToggleSelect(discord.ui.Select):
                 await self.bot.db.set_event_toggle(interaction.guild_id, event_key, enabled)
 
         summary = ", ".join(disabled_groups) if disabled_groups else "None"
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="success",
             title="Event Categories Updated",
-            color=SUCCESS_COLOR,
-            fields=[("Disabled", summary, False)],
+            color=self.bot.theme_color,
+            fields=[("Disabled", summary)],
         )
-        await interaction.response.edit_message(embed=embed, view=None)
-
-
-class GroupToggleView(discord.ui.View):
-    def __init__(self, bot: commands.Bot):
-        super().__init__(timeout=60)
-        self.add_item(GroupToggleSelect(bot))
+        await interaction.response.edit_message(view=view)
 
 
 class Settings(commands.Cog):
@@ -90,58 +77,68 @@ class Settings(commands.Cog):
     @settings_group.command(name="channel", description="Set the default channel logs are sent to.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def channel(self, interaction: discord.Interaction):
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="settings",
             title="Set Log Channel",
             color=self.bot.theme_color,
-            fields=[("Instructions", "Pick a channel from the dropdown below.", False)],
+            fields=[("Instructions", "Pick a channel from the dropdown below.")],
         )
         await interaction.response.send_message(
-            embed=embed, view=ChannelSelectView(self.bot), ephemeral=True
+            view=_combine(view, ChannelSelect(self.bot)), ephemeral=True
         )
 
     @settings_group.command(name="events", description="Enable or disable categories of logged events.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def events(self, interaction: discord.Interaction):
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="settings",
             title="Toggle Event Categories",
             color=self.bot.theme_color,
             fields=[
                 (
                     "Instructions",
                     "Select any categories you want to turn off. Leave empty to keep everything on.",
-                    False,
                 )
             ],
         )
         await interaction.response.send_message(
-            embed=embed, view=GroupToggleView(self.bot), ephemeral=True
+            view=_combine(view, GroupToggleSelect(self.bot)), ephemeral=True
         )
 
     @settings_group.command(name="status", description="View the current logging configuration.")
     async def status(self, interaction: discord.Interaction):
         cfg = await self.bot.db.get_guild_config(interaction.guild_id)
         channel = interaction.guild.get_channel(cfg["log_channel"]) if cfg["log_channel"] else None
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="settings",
             title="Logging Status",
             color=self.bot.theme_color,
             fields=[
-                ("Enabled", "Yes" if cfg["enabled"] else "No", True),
-                ("Log Channel", channel.mention if channel else "*Not set*", True),
+                ("Enabled", "Yes" if cfg["enabled"] else "No"),
+                ("Log Channel", channel.mention if channel else "*Not set*"),
             ],
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(view=view, ephemeral=True)
 
     @settings_group.command(name="toggle", description="Turn all logging on or off.")
     @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.describe(enabled="Whether logging should be active")
     async def toggle(self, interaction: discord.Interaction, enabled: bool):
         await self.bot.db.set_enabled(interaction.guild_id, enabled)
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="success",
             title="Logging Toggled",
-            color=SUCCESS_COLOR,
-            fields=[("Status", "Enabled" if enabled else "Disabled", False)],
+            color=self.bot.theme_color,
+            fields=[("Status", "Enabled" if enabled else "Disabled")],
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(view=view, ephemeral=True)
+
+
+def _combine(layout: LogLayout, select: discord.ui.Select) -> LogLayout:
+    """Append a select menu, wrapped in its own action row, to an existing CV2 container."""
+    container = layout.children[0]
+    container.add_item(discord.ui.ActionRow(select))
+    return layout
 
 
 async def setup(bot: commands.Bot):

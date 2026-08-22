@@ -2,8 +2,9 @@ import discord
 from discord.ext import commands
 
 from utils.audit import find_actor
-from utils.embeds import log_embed, user_line
-from utils.views import LogView
+from utils.format import user_line
+from utils.layout import LogLayout
+from utils.views import IDButton
 
 
 class ModerationLogs(commands.Cog):
@@ -18,24 +19,25 @@ class ModerationLogs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
-        # Distinguish a kick from a plain leave via the audit log.
         actor = await find_actor(member.guild, discord.AuditLogAction.kick, member.id)
         if actor is None:
             return
         dest = await self._channel_for(member.guild.id, "member_kick")
         if dest is None:
             return
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="member_kick",
             title="Member Kicked",
             color=self.bot.theme_color,
-            fields=[
-                ("Username", user_line(member), False),
-                ("Kicked By", user_line(actor), False),
-            ],
             thumbnail=member.display_avatar.url,
+            fields=[
+                ("Username", user_line(member)),
+                ("Kicked By", user_line(actor)),
+            ],
             footer=f"User ID: {member.id}",
+            buttons=[IDButton("User ID", member.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("User ID", member.id))
+        await dest.send(view=view)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.abc.User):
@@ -49,18 +51,20 @@ class ModerationLogs(commands.Cog):
                 if entry.target and entry.target.id == user.id:
                     reason = entry.reason
                     break
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="member_ban",
             title="Member Banned",
             color=self.bot.theme_color,
-            fields=[
-                ("Username", user_line(user), False),
-                ("Banned By", user_line(actor), False),
-                ("Reason", reason or "*No reason provided*", False),
-            ],
             thumbnail=user.display_avatar.url,
+            fields=[
+                ("Username", user_line(user)),
+                ("Banned By", user_line(actor)),
+                ("Reason", reason or "*No reason provided*"),
+            ],
             footer=f"User ID: {user.id}",
+            buttons=[IDButton("User ID", user.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("User ID", user.id))
+        await dest.send(view=view)
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, user: discord.abc.User):
@@ -68,17 +72,19 @@ class ModerationLogs(commands.Cog):
         if dest is None:
             return
         actor = await find_actor(guild, discord.AuditLogAction.unban, user.id)
-        embed = log_embed(
+        view = LogLayout(
+            emoji_key="member_unban",
             title="Member Unbanned",
             color=self.bot.theme_color,
-            fields=[
-                ("Username", user_line(user), False),
-                ("Unbanned By", user_line(actor), False),
-            ],
             thumbnail=user.display_avatar.url,
+            fields=[
+                ("Username", user_line(user)),
+                ("Unbanned By", user_line(actor)),
+            ],
             footer=f"User ID: {user.id}",
+            buttons=[IDButton("User ID", user.id)],
         )
-        await dest.send(embed=embed, view=LogView().add_id("User ID", user.id))
+        await dest.send(view=view)
 
 
 async def setup(bot: commands.Bot):

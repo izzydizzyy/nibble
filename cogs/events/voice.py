@@ -1,8 +1,9 @@
 import discord
 from discord.ext import commands
 
-from utils.embeds import log_embed, user_line
-from utils.views import LogView
+from utils.format import user_line
+from utils.layout import LogLayout
+from utils.views import IDButton
 
 
 class VoiceLogs(commands.Cog):
@@ -28,45 +29,45 @@ class VoiceLogs(commands.Cog):
         if before.channel is None and after.channel is not None:
             dest = await self._channel_for(member.guild.id, "voice_join")
             if dest:
-                embed = log_embed(
+                view = LogLayout(
+                    emoji_key="voice_join",
                     title="Voice Channel Joined",
                     color=self.bot.theme_color,
-                    fields=[
-                        ("Member", user_line(member), False),
-                        ("Channel", after.channel.mention, False),
-                    ],
+                    fields=[("Member", user_line(member)), ("Channel", after.channel.mention)],
                     footer=f"User ID: {member.id}",
+                    buttons=[IDButton("User ID", member.id)],
                 )
-                await dest.send(embed=embed, view=LogView().add_id("User ID", member.id))
+                await dest.send(view=view)
 
         elif before.channel is not None and after.channel is None:
             dest = await self._channel_for(member.guild.id, "voice_leave")
             if dest:
-                embed = log_embed(
+                view = LogLayout(
+                    emoji_key="voice_leave",
                     title="Voice Channel Left",
                     color=self.bot.theme_color,
-                    fields=[
-                        ("Member", user_line(member), False),
-                        ("Channel", before.channel.mention, False),
-                    ],
+                    fields=[("Member", user_line(member)), ("Channel", before.channel.mention)],
                     footer=f"User ID: {member.id}",
+                    buttons=[IDButton("User ID", member.id)],
                 )
-                await dest.send(embed=embed, view=LogView().add_id("User ID", member.id))
+                await dest.send(view=view)
 
         else:
             dest = await self._channel_for(member.guild.id, "voice_move")
             if dest:
-                embed = log_embed(
+                view = LogLayout(
+                    emoji_key="voice_move",
                     title="Voice Channel Switched",
                     color=self.bot.theme_color,
                     fields=[
-                        ("Member", user_line(member), False),
-                        ("From", before.channel.mention, True),
-                        ("To", after.channel.mention, True),
+                        ("Member", user_line(member)),
+                        ("From", before.channel.mention),
+                        ("To", after.channel.mention),
                     ],
                     footer=f"User ID: {member.id}",
+                    buttons=[IDButton("User ID", member.id)],
                 )
-                await dest.send(embed=embed, view=LogView().add_id("User ID", member.id))
+                await dest.send(view=view)
 
 
 async def setup(bot: commands.Bot):
